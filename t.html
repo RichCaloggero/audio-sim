@@ -1,0 +1,71 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>Test</title>
+</head>
+<body>
+<h1>Test</h1>
+
+<label>Load files: <input id="file-input" type="file" multiple></label>
+<button id="pause" aria-pressed="false">Pause</button>
+<br><label>listener position: <input type="text" id="position"></label>
+<br><label>listener orientation: <input type="text" id="orientation"></label>
+
+
+<script src="loadAudio.js"></script>
+<script type="module">
+import * as sim from "./audioSim.js";
+
+const fileInput = document.getElementById("file-input"); // Input element for selecting files
+const pause = document.querySelector("#pause");
+const position = document.querySelector("#position");
+const orientation = document.querySelector("#orientation");
+
+const audioContext = new AudioContext();
+
+fileInput.addEventListener('change', run);
+
+pause.addEventListener("click", e => {
+const state = not(e.target.getAttribute("aria-pressed") === "true");
+state? audioContext.suspend() : audioContext.resume();
+e.target.setAttribute("aria-pressed", state? "true" : "false");
+}); // pause button
+
+position.addEventListener("change", updateListenerPosition);
+orientation.addEventListener("change", updateListenerOrientation);
+
+function updateListenerPosition (e) {
+const [x, y, z] = position.value.split(" ").map(x => Number(x.trim()));
+console.log(`orientation: ${x}, ${y}, ${z}`);
+audioContext.listener.setPosition(x, y, z);
+} // updateListenerPosition
+
+function updateListenerOrientation (e) {
+const [x, y, z] = orientation.value.split(" ").map(x => Number(x.trim()));
+console.log(`orientation: ${x}, ${y}, ${z}`);
+audioContext.listener.setOrientation(x, y, z, 0,1,0);
+} // updateListenerOrientation
+
+async function run (event) {
+const files = event.target.files;
+let sources = null;
+
+try {
+sources = await loadAudioFiles(files, audioContext);
+console.log(`Loaded ${sources.length} audio files.`);
+} catch (e) {
+console.error(`error: ${e}`);
+} // catch
+
+const graph = await sim.buildAudioGraph(sources, audioContext);
+sim.start(graph);
+} // run
+
+function not (x) {return !x;}
+
+</script>
+
+</body>
+</html>
+

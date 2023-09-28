@@ -1,0 +1,107 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>Test</title>
+</head>
+<body>
+<h1>Test</h1>
+
+<label>file: <input autofocus type="file" value="t.wav"></label>
+
+
+<script src="loadAudio.js"></script>
+<script type="module">
+import * as automation from "./automation.js";
+const c = new AudioContext();
+await automation.initialize(c);
+//console.log("automation initialized.");
+
+const input = document.querySelector("input");
+input.addEventListener("change", run);
+
+async function run (e) {
+const sources = await loadAudioFiles(e.target.files, c);
+console.log("file ", sources[0], " loaded.");
+
+const source = new AudioBufferSourceNode(c, {buffer: sources[0]});
+
+const m = c.createChannelMerger(2);
+
+const p = new PannerNode(c, {
+panningModel: "HRTF",
+distanceModel: "linear",
+refDistance: 2,
+maxDistance: 10,
+rolloffFactor: 1,
+channelCount: 1,
+coneInnerAngle: 360,
+coneOuterAngle: 360
+});
+[p.orientationX.value, p.orientationY.value, p.orientationZ.value] = [1,0,0];
+
+c.listener.setPosition(0,0,1);
+c.listener.setOrientation(0,0,-1, 0,1,0);
+console.log("nodes created.");
+
+source.connect(m).connect(p).connect(c.destination);
+console.log("audio graph created.");
+try {
+move(p, [-1,0,-1], [1,0,1], source.buffer.duration);
+
+/*const x = p.positionX;
+const y = p.positionY;
+const z = p.positionZ;
+const dt = source.buffer.duration;
+const t = c.currentTime + dt;
+
+[x.value, z.value] = [-1, -1];
+x.linearRampToValueAtTime(1, t);
+z.linearRampToValueAtTime(1, t);
+console.log(`start:${ [x.value, y.value, z.value, c.currentTime, t].map(x => x.toFixed(2))}`);
+*/
+
+source.onended = () => {
+automation.disableAutomation();
+console.log(`done: ${c.currentTime}, ${positionOf(p)}`);
+}; // done
+
+automation.enableAutomation();
+source.start();
+
+} catch (e) {
+console.error(e);
+} // try
+
+function move (pan, from, to, interval) {
+const [x1,y1,z1] = from;
+const [x2,y2,z2] = to;
+const dt = automation.getAutomationInterval() / interval;
+const [dx, dy,dz] = [dt*(x2-x1), dt*(y2-y1), dt*(z2-z1)];
+console.log(`move: ${
+[dx,dy,dz,dt].map(x => x.toFixed(2))
+}\n`);
+
+[pan.positionX.value, pan.positionY.value, pan.positionZ.value] = [x1,y1,z1];
+console.log(`move: from = ${positionOf(pan)}\n`);
+
+automation.add(pan.positionX, x => x+dx, "x");
+automation.add(pan.positionY, y => y+dy, "y");
+automation.add(pan.positionZ, z => z+dz, "z");
+
+} // move
+
+function positionOf (t, digits = 2) {
+return [p.positionX, p.positionY, p.positionZ].map(
+p => p.value.toFixed(digits))
+} // positionOf
+} // run
+
+
+
+</script>
+
+
+</body>
+</html>
+
