@@ -36,16 +36,22 @@ position.addEventListener("change", updateListenerPosition);
 orientation.addEventListener("change", updateListenerOrientation);
 
 function updateListenerPosition (e) {
-const [x, y, z] = position.value.split(" ").map(x => Number(x.trim()));
+const [x, y, z] = getArray(position.value);
+
 console.log(`orientation: ${x}, ${y}, ${z}`);
 audioContext.listener.setPosition(x, y, z);
 } // updateListenerPosition
 
 function updateListenerOrientation (e) {
-const [x, y, z] = orientation.value.split(" ").map(x => Number(x.trim()));
+const [x, y, z] = getArray(orientation.value);
 console.log(`orientation: ${x}, ${y}, ${z}`);
 audioContext.listener.setOrientation(x, y, z, 0,1,0);
 } // updateListenerOrientation
+
+function getArray (s) {
+return s.split(/,* */).map(x => Number(x));
+} // getArray
+
 
 async function run (event) {
 const files = event.target.files;

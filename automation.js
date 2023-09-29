@@ -1,5 +1,3 @@
-
-
 let automationEnabled = false;
 let automationInterval = 0.1;
 let environment = {};
@@ -48,17 +46,17 @@ automator.port.postMessage(["enable", false]);
 automationEnabled = false;
 } // disableAutomation
 
-export function add (parameter, _function, name = "", startTime = -1, endTime = -1) {
-if (not(parameter)) return;
-if (not(_function)) return;
-automationQueue.push({name, parameter, startTime, endTime, nextValue: _function});
+export function add (object, action, name = "", startTime = -1, endTime = -1) {
+if (not(object)) return;
+if (not(action)) return;
+automationQueue.push({name, object, startTime, endTime, action});
 } // add
 
-export function remove ({name, parameter}) {
+export function remove ({name, object}) {
 let event;
-if(name && parameter) event = automationQueue.find(e => e.parameter === parameter && e.name === name);
+if(name && object) event = automationQueue.find(e => e.object === object && e.name === name);
 else if (name) event = automationQueue.find(e => e.name === name);
-else if (parameter) event = automationQueue.find(e => e.parameter === parameter);
+else if (object) event = automationQueue.find(e => e.object === object);
 
 if (event) automationQueue = automationQueue.filter(e => e !== event);
 
@@ -81,8 +79,11 @@ queue = queue.filter(event => {
 if (event.endTime >= 0 && t > event.endTime) return false;
 if (event.startTime >= 0 && t < event.startTime) return true;
 
-const p = event.parameter;
-p.value = event.nextValue(p.value);
+const object = event.object;
+// if it has a value then we assume an audioParam and assume the function computes it's next value
+if (object instanceof Object && "value" in object) p.value = event.action(object.value);
+// otherwise we assume a more generic event and apply the action to the object
+else event.action(object);
 return true;
 }); // filter
 

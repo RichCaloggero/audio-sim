@@ -15,7 +15,7 @@ return graph;
 } // buildAudioGraph
 
 function createActor (source, audio) {
-const delay =  random(30); // seconds
+const delay =  random(45); // seconds
 const startTime = audio.currentTime+delay;
 const endTime = startTime + source.duration;
 const merge = audio.createChannelMerger(2);
@@ -100,6 +100,7 @@ automation.add(x, (x => x+dx), "x", startTime, endTime);
 automation.add(y, (y => y+dy), "y", startTime, endTime);
 automation.add(z, (z => z+dz), "z", startTime, endTime);
 } // moveTo
+
 
 function positionOf (pan, digits = 2) {
 return [pan.positionX, pan.positionY, pan.positionZ].map(

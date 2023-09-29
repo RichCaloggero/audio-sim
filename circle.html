@@ -7,7 +7,7 @@
 <body> 
 <label>file: <input type="file" id="load"></label>
 <br><label>source: <input type="text" id="media" value="http://archive.org:80/download/gd1973-10-25.136695.sbd.sirmick.flac16/gd1973-10-25s103.mp3"></label>
-<audio crossorigin="anonymous" controls></audio>
+<audio src="dead.opus" crossorigin="anonymous" controls></audio>
 
 <br><label>x: <input id="x" type="number" value="0" min="-1" max="1" step=".01"></label>
 <br><label>y: <input id="y" type="number" value="0" min="-1" max="1" step=".01"></label>
@@ -17,24 +17,29 @@
 
 <script src="loadAudio.js"></script>
 <script type="module">
-document.querySelector("input").addEventListener("change", run);
+import * as automation from "./automation.js";
 
-async function run (e) {
+//document.querySelector("input").addEventListener("change", run);
 const c = new AudioContext();
-const sources = await loadAudioFiles(e.target.files, c);
-console.log("file loaded.");
+await automation.initialize(c);
+const media = document.querySelector("audio");
+const source = c.createMediaElementSource(media);
 
-const s = new AudioBufferSourceNode(c, {buffer: sources[0]});
-console.log("buffer created.");
+media.addEventListener("playing", () => run(source));
+media.addEventListener("pause", e => source.disconnect());
 
-//const media = document.querySelector("audio");
-//const s = c.createMediaElementSource(media);
+function run (source) {
+const c = source.context;
+
+c.listener.setPosition(0, 0, 0.5);
+c.listener.setOrientation(0, 0, -1, 0, 1, 0);
+
 
 const p = c.createPanner();
 const m = c.createChannelMerger(2);
 p.channelCount = 1;
 
-s.connect(m).connect(p).connect(c.destination);
+source.connect(m).connect(p).connect(c.destination);
 p.refDistance =1;
 p.rolloffFactor = 1;
 p.coneInnerAngle = 180;
@@ -42,16 +47,25 @@ p.coneOuterAngle = 360;
 p.maxDistance = 10;
 p.orientationX.value = 0;
 p.panningModel = "HRTF";
+const t1 = c.currentTime+5;
+const t2 = t1 + 10;
+console.log("audio graph created.");
+automation.enableAutomation();
 
-let a = 0;
-setInterval(() => {
-p.positionX.value = Math.cos(a);
-p.positionZ.value = Math.sin(a);
-a += 0.07;
-}, 80);
-s.start();
+automation.add(p, function (p) {
+if (this.started) {
+p.positionX.value = Math.cos(this.a);
+p.positionZ.value = Math.sin(this.a);
+this.a += 0.07;
+} else {
+console.log("circle started.");
+p.positionX.value = 1;
+p.positionZ.value = 0;
+this.a = 0;
+this.started = true;
+} // if
+}, "circle", t1, t2);
 
-document.querySelector("#media").addEventListener("change", e => media.src = e.target.value);
 } // run
 </script>
 
