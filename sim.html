@@ -7,8 +7,10 @@
 <body>
 <h1>Test</h1>
 
-<label>Load files: <input id="file-input" type="file" multiple></label>
+<label>debug: <input id="debug" type="checkbox"></label>
+<br><label>Load files: <input id="file-input" type="file" multiple></label>
 <button id="pause" aria-pressed="false">Pause</button>
+
 <br><label>listener position: <input type="text" id="position"></label>
 <br><label>listener orientation: <input type="text" id="orientation"></label>
 
@@ -21,8 +23,10 @@ const fileInput = document.getElementById("file-input"); // Input element for se
 const pause = document.querySelector("#pause");
 const position = document.querySelector("#position");
 const orientation = document.querySelector("#orientation");
+const debug = document.querySelector("#debug");
 
 const audioContext = new AudioContext();
+let running = false;
 
 fileInput.addEventListener('change', run);
 
@@ -32,8 +36,6 @@ state? audioContext.suspend() : audioContext.resume();
 e.target.setAttribute("aria-pressed", state? "true" : "false");
 }); // pause button
 
-position.addEventListener("change", updateListenerPosition);
-orientation.addEventListener("change", updateListenerOrientation);
 
 function updateListenerPosition (e) {
 const [x, y, z] = getArray(position.value);
@@ -49,7 +51,7 @@ audioContext.listener.setOrientation(x, y, z, 0,1,0);
 } // updateListenerOrientation
 
 function getArray (s) {
-return s.split(/,* */).map(x => Number(x));
+return s.split(",").map(x => Number(x));
 } // getArray
 
 
@@ -62,10 +64,20 @@ sources = await loadAudioFiles(files, audioContext);
 console.log(`Loaded ${sources.length} audio files.`);
 } catch (e) {
 console.error(`error: ${e}`);
+throw new Error(e);
 } // catch
+
+if (debug.checked) sim.setDebug(true);
 
 const graph = await sim.buildAudioGraph(sources, audioContext);
 sim.start(graph);
+
+if (debug.checked) {
+position.addEventListener("change", () => sim.setPositionOf(graph, 1, getArray(position.value)));
+} else {
+position.addEventListener("change", updateListenerPosition);
+orientation.addEventListener("change", updateListenerOrientation);
+} // if
 } // run
 
 function not (x) {return !x;}
