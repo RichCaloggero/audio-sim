@@ -1,20 +1,23 @@
+const colisionDistance = 0.05;
+const explosionData = await loadSound("./destruction.wav");
+
+
 let id = 0;
 import * as automation from "./automation.js";
 
 export async function buildAudioGraph (sources, audio) {
+const explosion = await audio.decodeAudioData(explosionData);
 await automation.initialize(audio);
 
-const graph = {
-audio,
-actors: sources.map(source => createActor(source, audio))
-};
+const graph = {audio, explosion};
+graph.actors = sources.map(source => createActor(source, audio, graph));
 audio.listener.setOrientation(0,0,-1, 0,1,0);
 audio.listener.setPosition(0,0, 1);
 
 return graph;
 } // buildAudioGraph
 
-function createActor (source, audio) {
+function createActor (source, audio, graph) {
 const delay =  random(45); // seconds
 const startTime = audio.currentTime+delay;
 const endTime = startTime + source.duration;
@@ -34,16 +37,19 @@ coneOuterAngle: 360
 
 moveTo(pan, randomPosition());
 
+
 const gain = audio.createGain(0.1);
 
 merge.connect(pan).connect(gain).connect(audio.destination);
 
-const actor = {id: ++id, playCount: 0,
-startTime, endTime,
+const actor = {
+id: ++id, playCount: 0, alive: true,
+graph, startTime, endTime,
 source, merge, pan, gain
 };
 //console.log("actor: ", actor);
 
+//colisionDetect(actor);
 return actor;
 } // createActor
 
@@ -57,6 +63,7 @@ automation.disableAutomation();
 } // stop
 
 function play (actor, audio) {
+if (not(actor.alive)) return;
 actor.playCount++;
 const node = audio.createBufferSource();
 node.connect(actor.merge);
@@ -66,6 +73,7 @@ node.buffer = actor.source;
 moveTo(actor.pan, randomPosition(), actor.startTime, actor.endTime);
 
 node.onended = () => {
+colisionDetect(actor);
 node.disconnect();
 update(actor);
 //console.log(`ended: ${actor.startTime}, ${actor.endTime}`);
@@ -101,6 +109,59 @@ automation.add(y, (y => y+dy), "y", startTime, endTime);
 automation.add(z, (z => z+dz), "z", startTime, endTime);
 } // moveTo
 
+function colisionDetect(actor) {
+const actors = actor.graph.actors;
+const distances = [];
+
+for (const otherActor of actor.graph.actors) {
+if (actor === otherActor) continue;
+distances.push({
+actor: otherActor,
+ds: distanceSquared(actor, otherActor)
+});
+} // for
+if (distances.length === 0) return;
+
+distances.sort((a,b) => a.ds < b.ds);
+if (realDistance(actor, distances[0].actor) < colisionDistance) collide(actor, distances[0].actor);
+} // colisionDetect
+
+function distanceSquared (actor1, actor2) {
+const [pan1, pan2] = [actor1.pan, actor2.pan];
+const [x1,y1,z1] = [pan1.positionX, pan1.positionY, pan1.positionZ];
+const [x2,y2,z2] = [pan2.positionX, pan2.positionY, pan2.positionZ];
+return Math.pow(x2-x1, 2) + Math.pow(y2-y1, 2) + Math.pow(z2-z1, 2);
+} // distanceSquared
+
+function realDistance (actor1, actor2) {
+return Math.sqrt(distanceSquared(actor1, actor2));
+} // realDistance
+
+function collide (actor1, actor2) {
+kill(actor1, actor2);
+generateExplosion(actor1);
+} // collide
+
+function kill (...actors) {
+actors.forEach(a => a.alive = false);
+} // kill
+
+function generateExplosion (actor) {
+const source = actor.audio.createBufferSource();
+source.buffer = actor.graph.explosion;
+source.connect(actor.merge);
+source.onended = () => source.disconnect();
+source.start();
+} // generateExplosion
+
+async function loadSound (fileName) {
+const response = await fetch(fileName);
+if (not(response.ok)) {
+throw new Error(`cannot load sound from ${fileName}`);
+} // if
+
+return await response.arrayBuffer();
+} // loadSound
 
 function positionOf (pan, digits = 2) {
 return [pan.positionX, pan.positionY, pan.positionZ].map(

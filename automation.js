@@ -69,7 +69,7 @@ eventQueue.push({time, handler, actor});
 
 function tick (audioContext, automationQueue, eventQueue) {
 automationQueue = processAutomation(automationQueue, audioContext);
-eventQueue = processEvents(eventQueue, audioContext);
+//eventQueue = processEvents(eventQueue, audioContext);
 } // tick
 
 function processAutomation (queue, audioContext) {
@@ -81,7 +81,7 @@ if (event.startTime >= 0 && t < event.startTime) return true;
 
 const object = event.object;
 // if it has a value then we assume an audioParam and assume the function computes it's next value
-if (object instanceof Object && "value" in object) p.value = event.action(object.value);
+if (object instanceof Object && "value" in object) object.value = event.action(object.value);
 // otherwise we assume a more generic event and apply the action to the object
 else event.action(object);
 return true;
