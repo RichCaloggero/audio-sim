@@ -1,6 +1,6 @@
 let debug = false;
 let collisionTest = false;
-const colisionDistance = 0.05;
+const colisionDistance = 0.01;
 const explosionData = await loadSound("./destruction.wav");
 
 
@@ -8,13 +8,14 @@ let id = 0;
 import * as automation from "./automation.js";
 
 export async function buildAudioGraph (sources, audio) {
+let times = window.times = [];
 const explosion = await audio.decodeAudioData(explosionData);
 await automation.initialize(audio);
 
 const graph = {audio, explosion};
 graph.actors = sources.map(source => createActor(source, audio, graph));
 audio.listener.setOrientation(0,0,-1, 0,1,0);
-audio.listener.setPosition(0,0, 1);
+audio.listener.setPosition(0,0, -0.5);
 
 return graph;
 } // buildAudioGraph
@@ -38,7 +39,6 @@ coneOuterAngle: 360
 });
 [pan.orientationX.value, pan.orientationY.value, pan.orientationZ.value] = [1,0,0];
 
-moveTo(pan, randomPosition());
 
 
 const gain = audio.createGain(0.1);
@@ -53,6 +53,7 @@ source, merge, pan, gain
 //console.log("actor: ", actor);
 
 if (debug) console.log(`actor ${actor.id}: ${positionOf(pan)}`);
+moveTo(actor, randomPosition());
 
 return actor;
 } // createActor
@@ -64,7 +65,7 @@ for (const actor of actors) play(actor, audioGraph.audio);
 automation.enableAutomation();
 
 if (debug) {
-moveTo(actors[0].pan, getPosition(actors[1]));
+moveTo(actors[0], getPosition(actors[1]));
 collisionTest = true;
 } // if
 } // start
@@ -79,13 +80,14 @@ actor.playCount++;
 const node = audio.createBufferSource();
 node.connect(actor.merge);
 node.buffer = actor.source;
+actor.player = node;
 
 //console.log(`play: from = ${positionOf(actor.pan)}`);
-if (not(debug)) moveTo(actor.pan, randomPosition(), actor.startTime, actor.endTime);
+if (not(debug)) moveTo(actor, randomPosition(), actor.startTime, actor.endTime);
 
 node.onended = () => {
+actor.player = null;
 node.disconnect();
-collisionDetect(actor);
 update(actor);
 //console.log(`ended: ${actor.startTime}, ${actor.endTime}`);
 play(actor, audio);
@@ -95,14 +97,16 @@ node.start(actor.startTime);
 } // play
 
 function update (actor) {
+if (not(actor.alive)) return;
 const delay = debug?
 random(7) : random(40,20);
 actor.startTime = actor.endTime + delay;
 actor.endTime = actor.startTime + actor.source.duration;
 } // update
 
-function moveTo (pan, to, startTime = -1, endTime = -1) {
+function moveTo (actor, to, startTime = -1, endTime = -1) {
 if (debug) console.log(`moveTo: ${to.map(x => x.toFixed(2))}`);
+const pan = actor.pan;
 const [x,y,z] = [pan.positionX, pan.positionY, pan.positionZ];
 const [x1,y1,z1] = to;
 
@@ -116,15 +120,17 @@ const dt = automation.getAutomationInterval() / (endTime - startTime);
 const [dx, dy,dz] = [dt*(x1-x.value), dt*(y1-y.value), dt*(z1-z.value)];
 //console.log(`- ${[dx,dy,dz,dt].map(x => x.toFixed(2))}`);
 
-automation.add(x, (x => x+dx), "x", startTime, endTime);
-automation.add(y, (y => y+dy), "y", startTime, endTime);
-automation.add(z, (z => z+dz), "z", startTime, endTime);
+automation.add(x, (x => x.value += dx), "x", startTime, endTime);
+automation.add(y, (y => y.value += dy), "y", startTime, endTime);
+automation.add(z, (z => z.value += dz), "z", startTime, endTime);
+automation.add(actor, collisionDetect, "collisionDetect", startTime, endTime);
 } // moveTo
 
 
 function collisionDetect(actor) {
 const actors = actor.graph.actors;
 const distances = [];
+const t0 = performance.now();
 
 for (const otherActor of actor.graph.actors) {
 if (not(actor.alive) || actor === otherActor) continue;
@@ -143,7 +149,13 @@ if (a === b) return 0;
 return (a < b)? -1 : 1;
 });
 
-if (realDistance(actor, distances[0].actor) < colisionDistance) collide(actor, distances[0].actor);
+let d;
+for (d of distances) {
+if (realDistance(actor, d.actor) < colisionDistance) collide(actor, d.actor);
+else break;
+} // for
+
+times.push(performance.now() - t0);
 } // colisionDetect
 
 function distanceSquared (actor1, actor2) {
@@ -169,7 +181,14 @@ generateExplosion(actor1);
 } // collide
 
 function kill (...actors) {
-actors.forEach(a => a.alive = false);
+for (const actor of actors) {
+actor.alive = false;
+if (actor.player) actor.player.disconnect();
+automation.remove(actor.pan.positionX);
+automation.remove(actor.pan.positionY);
+automation.remove(actor.pan.positionZ);
+automation.remove(actor);
+} // for
 } // kill
 
 function generateExplosion (actor) {
@@ -234,5 +253,5 @@ if (not(actor)) throw new Error(`invalid id: ${id}`);
 
 console.log("setPosition: ", actor);
 collisionTest = true;
-moveTo(actor.pan, position);
+moveTo(actor, position);
 } // setPositionOf

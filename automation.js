@@ -1,5 +1,5 @@
 let automationEnabled = false;
-let automationInterval = 0.1;
+let automationInterval = 0.05;
 let environment = {};
 let automator = null;
 let automationQueue = [];
@@ -10,7 +10,7 @@ export async function initialize (audioContext) {
 if (automator) return; // already initialized
 
 await audioContext.audioWorklet.addModule("./automator.worklet.js");
-console.log("audioWorklet.automator created.");
+//console.log("audioWorklet.automator created.");
 
 automator = new AudioWorkletNode(audioContext, "automator");
 automator.port.onmessage = e => {
@@ -31,8 +31,8 @@ export function getAutomationInterval () {return automationInterval;}
 export function setAutomationInterval (value) {
 value = Number(value);
 if (value && value > 0) {
-automator.port.postMessage(["automationInterval", value]);
 automationInterval = value;
+if (automator) automator.port.postMessage(["automationInterval", value]);
 } // if
 } // setAutomationInterval
 
@@ -74,18 +74,35 @@ automationQueue = processAutomation(automationQueue, audioContext);
 
 function processAutomation (queue, audioContext) {
 const t = audioContext.currentTime;
+//console.log(`${t.toFixed(2)}: ${queue.length} events`);
 
 queue = queue.filter(event => {
-if (event.endTime >= 0 && t > event.endTime) return false;
+//console.log("- ", event);
+
+// keep events that have no start and end times
+if (event.startTime < 0 && event.endTime < 0) return true;
+
+// keep events that haven't happened yet
 if (event.startTime >= 0 && t < event.startTime) return true;
 
+// throw away events that are past due
+if (event.endTime >= 0 && t > event.endTime) return false;
+
+//console.log("- applying ", event.object, " to ", event.action);
+event.action(event.object);
+return true;
+});
+/*.map(event => {
 const object = event.object;
 // if it has a value then we assume an audioParam and assume the function computes it's next value
 if (object instanceof Object && "value" in object) object.value = event.action(object.value);
 // otherwise we assume a more generic event and apply the action to the object
-else event.action(object);
-return true;
+else
+
+return event;
 }); // filter
+*/
+//console.log(`- queue: ${queue.length}`);
 
 return queue;
 } // processAutomation

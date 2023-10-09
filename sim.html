@@ -2,6 +2,10 @@
 <html>
 <head>
 <meta charset="utf-8">
+<meta http-equiv="Cross-Origin-Opener-Policy" content="same-origin">
+<meta http-equiv="Cross-Origin-Embedder-Policy" content="require-corp">
+<meta name="author" content="rjc">
+
 <title>Test</title>
 </head>
 <body>
@@ -40,7 +44,7 @@ e.target.setAttribute("aria-pressed", state? "true" : "false");
 function updateListenerPosition (e) {
 const [x, y, z] = getArray(position.value);
 
-console.log(`orientation: ${x}, ${y}, ${z}`);
+console.log(`position: ${x}, ${y}, ${z}`);
 audioContext.listener.setPosition(x, y, z);
 } // updateListenerPosition
 
